@@ -1,0 +1,16 @@
+{
+  "name": "oen",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev:web": "npm --prefix apps/web run dev",
+    "dev:api": "npm --prefix apps/api run dev",
+    "dev": "concurrently \"npm run dev:web\" \"npm run dev:api\""
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
