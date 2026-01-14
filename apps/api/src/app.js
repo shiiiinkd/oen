@@ -1,6 +1,7 @@
 import express from "express";
 import healthRouter from "./routes/health.js";
 import authRouter from "./routes/auth/index.js";
+import loginRouter from "./routes/login.js";
 
 const createApp = () => {
   const app = express();
@@ -14,6 +15,7 @@ const createApp = () => {
 
   app.use("/health", healthRouter);
   app.use("/auth", authRouter);
+  app.use("/login", loginRouter);
 
   return app;
 };

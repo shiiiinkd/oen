@@ -1,15 +1,15 @@
-// apps/web/app/health/page.tsx
+// apps/web/app/login/page.tsx
 
 // これは Server Component（デフォルト）なので、サーバー側で動きます。
-// ただし、呼び出す先は Express 直ではなく、BFFの /api/health に統一します。
+// ただし、呼び出す先は Express 直ではなく、BFFの /api/login に統一します。
 
-type HealthResult =
+type LoginResult =
   | { ok: true; status: number; body: string }
   | { ok: false; status?: number; error: string; body?: string };
 
-async function fetchHealth(): Promise<HealthResult> {
+async function fetchLogin(): Promise<LoginResult> {
   try {
-    const res = await fetch("/api/health", {
+    const res = await fetch("/api/login", {
       cache: "no-store",
     });
     const body = await res.text();
@@ -30,12 +30,13 @@ async function fetchHealth(): Promise<HealthResult> {
   }
 }
 
-export default async function HealthPage() {
-  const result = await fetchHealth();
+export default async function LoginPage() {
+  const result = await fetchLogin();
 
   return (
     <main style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
-      <h1>Oh!EN Health Check</h1>
+      <h1>Oh!EN Login</h1>
+      <button>LINE Login開始ボタン</button>
 
       {result.ok ? (
         <>
