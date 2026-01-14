@@ -9,7 +9,7 @@ type HealthResult =
 
 async function fetchHealth(): Promise<HealthResult> {
   try {
-    const res = await fetch("http://localhost:3000/api/health", {
+    const res = await fetch(`${process.env.OEN_NEXT_BASE_URL}/api/health`, {
       cache: "no-store",
     });
     const body = await res.text();
