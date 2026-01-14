@@ -1,24 +1,34 @@
 // apps/web/app/login/page.tsx
 
 // これは Server Component（デフォルト）なので、サーバー側で動きます。
-// ただし、呼び出す先は Express 直ではなく、BFFの /api/login に統一します。
+// Node.js の fetch は相対URL "/api/..." を解決できず落ちることがあるため、
+// Server Component からは Next の /api/* を叩かず、Express(API) を直に呼びます。
 
 type LoginResult =
   | { ok: true; status: number; body: string }
   | { ok: false; status?: number; error: string; body?: string };
 
+function mustGetApiBaseUrl(): string {
+  const baseUrl = process.env.OEN_API_BASE_URL;
+  if (!baseUrl) {
+    throw new Error("OEN_API_BASE_URL is not set");
+  }
+  return baseUrl;
+}
+
 async function fetchLogin(): Promise<LoginResult> {
   try {
-    const res = await fetch("/api/login", {
-      cache: "no-store",
-    });
+    const baseUrl = mustGetApiBaseUrl();
+    const url = new URL("/login", baseUrl);
+
+    const res = await fetch(url, { cache: "no-store" });
     const body = await res.text();
 
     if (!res.ok) {
       return {
         ok: false,
         status: res.status,
-        error: "BFF returned error",
+        error: "API returned error",
         body,
       };
     }
