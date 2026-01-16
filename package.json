@@ -6,6 +6,7 @@
     "dev:web": "npm --prefix apps/web run dev",
     "dev:api": "npm --prefix apps/api run dev",
     "dev": "concurrently \"npm run dev:web\" \"npm run dev:api\"",
+    "heroku-postbuild": "npm --prefix apps/api install --omit=dev",
     "start": "npm --prefix apps/api start"
   },
   "devDependencies": {
