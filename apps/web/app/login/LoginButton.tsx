@@ -8,8 +8,9 @@ export default function LoginButton() {
     const res = await fetch("/api/login/mock", { method: "POST" });
     if (res.ok) {
       router.push("/me");
+    } else {
+      console.log("ステータスエラー: " + res.status);
     }
-    console.log("ステータスエラー: " + res.status);
   };
   return <button onClick={handleLogin}>LoginButtonコンポーネント</button>;
 }

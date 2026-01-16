@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import LogoutButton from "./LogoutButton";
+
 export default function MePage() {
   const [data, setData] = useState<{ id: string; name: string } | null>(null);
   const router = useRouter();
@@ -20,6 +22,7 @@ export default function MePage() {
       <h1>MePage</h1>
       {data ? <p>oen_session: {data.id}</p> : <p>oen_session is not set</p>}
       {data ? <p>name: {data.name}</p> : <p>name is not set</p>}
+      <LogoutButton />
     </>
   );
 }
