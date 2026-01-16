@@ -1,5 +1,6 @@
 // apps/web/app/login/page.tsx
 
+import LoginButton from "./LoginButton";
 // これは Server Component（デフォルト）なので、サーバー側で動きます。
 // Node.js の fetch は相対URL "/api/..." を解決できず落ちることがあるため、
 // Server Component からは Next の /api/* を叩かず、Express(API) を直に呼びます。
@@ -46,7 +47,7 @@ export default async function LoginPage() {
   return (
     <main style={{ padding: 24, fontFamily: "system-ui, sans-serif" }}>
       <h1>Oh!EN Login</h1>
-      <button>LINE Login開始ボタン</button>
+      <LoginButton />
 
       {result.ok ? (
         <>
