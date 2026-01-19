@@ -4,15 +4,14 @@
 // Node.js の fetch は相対URL "/api/..." を解決できず落ちることがあるため、
 // Server Component からは Next の /api/* を叩かず、Express(API) を直に呼びます。
 
+import { requireEnv } from "@/app/_lib/env";
+
 type HealthResult =
   | { ok: true; status: number; body: string }
   | { ok: false; status?: number; error: string; body?: string };
 
 function mustGetApiBaseUrl(): string {
-  const baseUrl = process.env.OEN_API_BASE_URL;
-  if (!baseUrl) {
-    throw new Error("OEN_API_BASE_URL is not set");
-  }
+  const baseUrl = requireEnv("OEN_API_BASE_URL");
   return baseUrl;
 }
 

@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
+import { requireEnv, isMissingEnvError } from "@/app/_lib/env";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const baseUrl = process.env.OEN_API_BASE_URL;
-  if (!baseUrl) {
-    return NextResponse.json(
-      { ok: false, error: "OEN_API_BASE_URL is not set" },
-      { status: 500 }
-    );
-  }
   try {
+    const baseUrl = requireEnv("OEN_API_BASE_URL");
     //Next(サーバー)　→　Express(API)を呼ぶ
     const res = await fetch(`${baseUrl}/health`, {
       cache: "no-store",
@@ -27,7 +22,17 @@ export async function GET() {
       },
     });
   } catch (error) {
+    if (isMissingEnvError(error)) {
+      return NextResponse.json(
+        { ok: false, error: "env_missing" },
+        { status: 500 }
+      );
+    }
+
     const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ ok: false, error: message }, { status: 502 });
+    return NextResponse.json(
+      { ok: false, error: message },
+      { status: 502 }
+    );
   }
 }

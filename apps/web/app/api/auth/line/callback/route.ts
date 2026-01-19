@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { getLineRedirectUri } from "@/app/_lib/line/oauth";
+import { requireEnv, isMissingEnvError } from "@/app/_lib/env";
 
 export const runtime = "nodejs";
 
@@ -64,11 +66,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    const channelId = process.env.LINE_CHANNEL_ID;
-    const channelSecret = process.env.LINE_CHANNEL_SECRET;
-    const redirectUri = process.env.LINE_REDIRECT_URI;
-    if (!channelId || !channelSecret || !redirectUri)
-      return redirectToLogin("env_missing");
+    const channelId = requireEnv("LINE_CHANNEL_ID");
+    const channelSecret = requireEnv("LINE_CHANNEL_SECRET");
+    const redirectUri = getLineRedirectUri();
 
     //token交換 codeを使ってtokenを取得
     const tokenUrl = `https://api.line.me/oauth2/v2.1/token`;
@@ -123,6 +123,9 @@ export async function GET(request: Request) {
     setSessionCookie(res);
     return res;
   } catch (error) {
+    if (isMissingEnvError(error)) {
+      return redirectToLogin("env_missing");
+    }
     return redirectToLogin("callback_exception");
   }
 }
