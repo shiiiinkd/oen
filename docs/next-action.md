@@ -1,108 +1,212 @@
-# Oh!EN 認証（Cookie / セッション ID 方式）メモ（2026-01-14）
+# next-action.md
 
-## 前提（プロジェクト構成と方針）
+## Step 1 : LINE ログイン → ダッシュボード到達（MVP）
 
-- プロジェクト「Oh!EN」は **Next.js（BFF） + Express（API）** の分離構成。
-- ブラウザは **Next のみ**を叩く（Express 直叩き禁止）。
-- 最終目標は **LINE Login** だが、MVP 優先・縦スライスで進め、UI は後回し。
-- 自分でコードを書いて成長する（完成コードを丸ごと提示するより、設計・手順・落とし穴整理を重視）。
+---
 
-## 現状（動いているもの）
+## 目的（Step 1）
 
-- ルートで `npm run dev` により `apps/web` と `apps/api` を同時起動。
-- Express（API）
-  - `GET /health` -> `{ msg: "Health check successful!" }`
-  - `GET /auth/me` -> `{ msg: "auth router is working!" }`（スタブ）
-  - `GET /login` -> `{ msg: "Login check successful!" }`（スタブ）
-- Next（web）
-  - ページ: `/`（テンプレ）, `/health`, `/login`
-  - BFF API:
-    - `/api/health` -> Express `/health`
-    - `/api/auth/me` -> Express `/auth/me`
-    - `/api/login` -> Express `/login`
-- env（apps/web/.env.local）
-  - `OEN_API_BASE_URL=http://localhost:8080`（Next→Express 用）
-  - `OEN_NEXT_BASE_URL=http://localhost:3000`（現状設定済み）
-- 疎通確認
-  - `/health` で Next(BFF) → Express の疎通 OK（"Health check successful!" が表示される）。
+LINE ログインで認証できるようにし、  
+ログイン完了後に **Oh!EN のダッシュボード（仮）へ到達できる状態** を作る。
 
-## 今日決めたこと（設計の意思決定）
+本ステップでは「LINE ログインが成立し、ログイン状態がアプリ内で継続する」ことだけに集中する。
 
-### 1) ログイン状態管理は「Cookie（セッション ID 方式）」でいく
+---
 
-- 方式: Cookie に **セッション ID**（例: `oen_session=...`）を保存し、サーバーが検証してユーザーを確定する。
-- 理由:
-  - BFF 構成と相性が良く、後で LINE ログインに差し替えやすい。
-  - `/api/auth/me` を「唯一の真実」にでき、画面が単純になる。
+## Done の定義（受け入れ条件）
 
-### 2) “ログインのフロー” と “認証状態（セッション）” を分ける
+- ブラウザで `/login` を開ける
+- 「LINE でログイン」ボタンを押す
+- LINE 認可画面が表示され、許可できる
+- Oh!EN に戻ってきて **セッション Cookie（oen_session）が発行される**
+- `/dashboard`（または `/me`）に遷移し、ログイン状態が維持される
+- `GET /api/auth/me`
+  - ログイン時 : `200`
+  - 未ログイン時 : `401`
+- `401` 時はログインガードが正しく機能する
 
-- `/api/login/*` はログインフロー（開始・コールバック・模擬ログイン等）
-- `/api/auth/*` は認証状態（me、logout 等）
+---
 
-### 3) 案 A で進める（Next(BFF)で Cookie を見て判定する）
+## 前提（現状の資産）
 
-- `GET /api/auth/me` は **Next 側で Cookie を読み、ログイン判定して返す**。
-- Express は当面「内部 API」扱いにしてもよい（少なくともブラウザから叩かない）。
-- 理由:
-  - Next→Express へ Cookie を転送して…という設計（案 B）を先にやると複雑になる。
-  - まずは「Next だけでログイン成立 →/me が 200」を作るのが最短。
+### Next（apps/web）
 
-### 4) URL（相対/絶対）の方針
+- Cookie セッション（`oen_session`）の発行・判定・logout は実装済み
+- 認証判定点は **`GET /api/auth/me` に統一**
+- 本番は **Vercel にデプロイ済み**
+  - 公開 URL: https://oen-seven.vercel.app
 
-- ブラウザ → Next(BFF): **相対 URL**で叩く（例: `fetch("/api/auth/me")`）
-- Next(BFF) → Express(API): **`OEN_API_BASE_URL` の絶対 URL**で叩く
-- `OEN_NEXT_BASE_URL` は将来の callback URL 生成などで必要になる可能性があるが、MVP は相対中心で OK。
+### Express（apps/api）
 
-## 重要な考え方（MVP の“縦スライス”の芯）
+- 現状はスタブのみ
+- LINE ログイン本体は未着手
+- Heroku にデプロイ済み（裏方 API）
 
-- `/api/auth/me` を「唯一の判定点（真実）」にする。
-  - ログイン済み: **200 + user JSON**
-  - 未ログイン: **401**
-- UI は “結果を見るだけ” にする。
-  - `/me` ページは `/api/auth/me` の結果で表示/誘導を分岐する。
-  - `/login` は「ログイン開始（mock）」ボタンがあれば十分。
+---
 
-## 次回やること（小さく、確実に前へ進む順）
+## 設計方針（固定）
 
-### Step 0: 目標の確認（このサイクルで達成したい状態）
+- **ブラウザは Next のみを叩く**
+- Express をブラウザから直接叩かない
+- Next は **BFF（Backend For Frontend）**
+- Express は **裏方 API**
+- LINE ログインは「本物のログイン」に差し替えるが、既存の縦スライスは崩さない
+- **Redirect URI は Next（Vercel）に固定する**
 
-- 未ログイン: `/me` → 401 → `/login`へ誘導（または「ログインしてください」表示）
-- 模擬ログイン後: `/me` → 200 でユーザー情報表示
-- ログアウト後: `/me` → 401 に戻る
+---
 
-### Step 1: Next 側に “模擬ログイン” を作る（Cookie 発行）
+## 大まかな実装フロー（Step 1）
 
-- `POST /api/login/mock`（BFF）を作り、成功時に `Set-Cookie` を返す。
-- Cookie は `HttpOnly` / `SameSite=Lax` を基本に検討する。
+### 全体フロー（責務）
 
-### Step 2: Next 側で “me” を作る（Cookie 読取り・検証）
+1. ブラウザ → Next `/login`
+2. Next → LINE 認可画面へリダイレクト（Authorize URL）
+3. LINE → Next（callback）へリダイレクト（`code`, `state`）
+4. Next（callback）
+   - `code/state` 検証
+   - LINE Token API で交換
+   - ID Token / ユーザー情報取得
+5. Next が **`oen_session` Cookie を発行**
+6. Next が `/dashboard` へリダイレクト
+7. `/dashboard` は `GET /api/auth/me` でログイン確認
 
-- `GET /api/auth/me` を Next で完結させる（案 A）。
-  - Cookie が有効なら 200 で user
-  - Cookie がなければ 401
+---
 
-### Step 3: `/me` ページを作る（401 ハンドリング）
+## 作業ステップ（順序付き）
 
-- `/me` で `fetch("/api/auth/me")`
-- 401 なら `/login` 誘導（サーバーリダイレクト or 画面表示はどちらでも可）
+### 0. 画面・ルートの最低限を確定
 
-### Step 4: `POST /api/auth/logout` を作る（Cookie 破棄）
+- `/dashboard` を新規作成（中身は白で OK）
+- `/dashboard` で `GET /api/auth/me` を実行
+  - `401` → `/login` にリダイレクト
+  - `200` → 「ログイン中」表示
+- 既存 `/me` を仮ダッシュボードとして使ってもよい
+  - 最終的には `/dashboard` に統一
 
-- `Set-Cookie`で期限切れにしてログアウトを成立させる。
+---
 
-## 注意点（落とし穴メモ）
+### 1. LINE チャネル準備（設定）
 
-- Cookie の「発行（Set-Cookie）」と「判定（Cookie 読取り）」は分ける（責務混在を避ける）。
-- 認証 Cookie は基本 `HttpOnly`（JS から読めない）で扱う。
-- `SameSite` と `Secure` は本番で必須要素（MVP でも意識しておく）。
-- “ログインできたか” を返すだけだと縦に進まない。必ず「状態（セッション）を作る」こと。
+- LINE Developers で **LINE Login チャネル**を作成
+- Redirect URI を以下に設定する
 
-## 参考（現在の主要ファイル）
+https://oen-seven.vercel.app/api/auth/line/callback
 
-- Next(BFF) me: `apps/web/app/api/auth/me/route.ts`
-- Next(BFF) login: `apps/web/app/api/login/route.ts`
-- Next page login: `apps/web/app/login/page.tsx`
-- Express app: `apps/api/src/app.js`
-- Express auth stub: `apps/api/src/routes/auth/index.js`
-- Express login stub: `apps/api/src/routes/login.js`
+- スコープは最小構成から開始
+  - `openid`
+  - `profile`
+- メールアドレス取得は必須にしない
+
+---
+
+### 2. LINE ログイン開始エンドポイントを追加
+
+**目的**  
+Authorize URL を生成し、LINE 認可画面へリダイレクトする。
+
+- エンドポイント
+  GET /api/auth/line
+
+**やること**
+
+- `state` を生成（CSRF 対策）
+- `nonce` を生成（ID Token 検証用）
+- 以下を **短命 Cookie** に保存（推奨）
+  - `oen_oauth_state`
+  - `oen_oauth_nonce`
+- LINE Authorize URL へリダイレクト
+
+**注意**
+
+- ログイン画面の「LINE でログイン」ボタンは
+  - この API を叩くだけ
+  - state / nonce を画面側で生成しない
+
+---
+
+### 3. LINE コールバックエンドポイントを追加
+
+**目的**  
+認可結果を受け取り、Oh!EN のログインを成立させる。
+
+- エンドポイント
+  GET /api/auth/line/callback
+
+**処理順（重要）**
+
+1. クエリから `code` / `state` を取得
+2. Cookie の `oen_oauth_state` と一致するか検証
+   - 不一致ならエラー
+3. LINE Token API に `code` を送ってトークン交換
+4. ID Token / ユーザー情報から **LINE ユーザーを一意に特定**
+   - Step 1 では `sub` 等が取れれば十分
+5. `oen_session` Cookie を発行
+   - 中身はランダムなセッション ID 推奨
+6. `/dashboard` にリダイレクト
+7. `oen_oauth_state` / `oen_oauth_nonce` Cookie を破棄
+
+---
+
+### 4. `GET /api/auth/me` を本物に寄せる
+
+現状は「Cookie があればダミー user」。
+
+Step 1 では以下どちらかで OK。
+
+#### A 案（最短）
+
+- Cookie があれば `200`
+- user 情報を LINE 由来に差し替える
+  - `id`, `name` など最低限
+
+#### B 案（次につながる）
+
+- Cookie はセッション ID
+- Next 側で
+  sessionId -> lineUser
+
+を保持し、`/api/auth/me` はそこから user を返す
+
+※ B 案はメモリ保持のため再起動で消えるが、Step 1 では許容
+
+---
+
+### 5. mock ログインの扱い
+
+- Step 1 完了までは残して OK（デバッグ用）
+- 完了後は
+  - LINE ログインを主導線に
+  - mock は env で非表示 or 削除
+
+---
+
+### 6. 動作確認
+
+- 未ログインで `/dashboard` → `/login`
+- `/login` → LINE 認可 → callback → `/dashboard`
+- `/dashboard` で `/api/auth/me` が `200`
+- logout → `/api/auth/me` が `401`
+- state 不一致で弾かれる
+
+---
+
+## この Step で「やらないこと」（意図的な撤退）
+
+- Express 側での本格セッション管理（DB）
+- ユーザー永続化（users テーブル等）
+- Messaging API 連携
+- PayPay 導線（SupportIntent）
+- 複数活動者対応
+
+---
+
+## 成果物一覧（Step 1）
+
+- `/dashboard`（または `/me`）
+- `GET /api/auth/line`
+- `GET /api/auth/line/callback`
+- `GET /api/auth/me`
+- `POST /api/auth/logout`
+- LINE Developers 側設定（Redirect URI）
+
+---

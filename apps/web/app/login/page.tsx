@@ -1,6 +1,7 @@
 // apps/web/app/login/page.tsx
 
 import LoginButton from "./LoginButton";
+import { requireEnv } from "@/app/_lib/env";
 // これは Server Component（デフォルト）なので、サーバー側で動きます。
 // Node.js の fetch は相対URL "/api/..." を解決できず落ちることがあるため、
 // Server Component からは Next の /api/* を叩かず、Express(API) を直に呼びます。
@@ -10,10 +11,7 @@ type LoginResult =
   | { ok: false; status?: number; error: string; body?: string };
 
 function mustGetApiBaseUrl(): string {
-  const baseUrl = process.env.OEN_API_BASE_URL;
-  if (!baseUrl) {
-    throw new Error("OEN_API_BASE_URL is not set");
-  }
+  const baseUrl = requireEnv("OEN_API_BASE_URL");
   return baseUrl;
 }
 
