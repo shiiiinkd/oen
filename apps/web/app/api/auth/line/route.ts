@@ -13,7 +13,7 @@ export async function GET() {
     const nonce = crypto.randomUUID();
 
     const authorizeUrl = new URL(
-      "https://access.line.me/oauth2/v2.1/authorize"
+      "https://access.line.me/oauth2/v2.1/authorize",
     );
     authorizeUrl.searchParams.set("response_type", "code");
     authorizeUrl.searchParams.set("client_id", channelId);
@@ -43,12 +43,12 @@ export async function GET() {
     if (isMissingEnvError(error)) {
       return NextResponse.json(
         { ok: false, error: "env_missing" },
-        { status: 500 }
+        { status: 500 },
       );
     }
     return NextResponse.json(
       { ok: false, error: "Unknown error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

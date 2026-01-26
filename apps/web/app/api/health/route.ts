@@ -25,14 +25,11 @@ export async function GET() {
     if (isMissingEnvError(error)) {
       return NextResponse.json(
         { ok: false, error: "env_missing" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json(
-      { ok: false, error: message },
-      { status: 502 }
-    );
+    return NextResponse.json({ ok: false, error: message }, { status: 502 });
   }
 }
