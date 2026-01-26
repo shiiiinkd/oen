@@ -10,6 +10,7 @@ export async function POST() {
   const sessionId = cookieStore.get("oen_session")?.value;
   const res = NextResponse.json({ ok: true }, { status: 200 });
   const isProd = process.env.NODE_ENV === "production";
+
   res.cookies.set({
     name: "oen_session",
     value: "",
@@ -19,6 +20,7 @@ export async function POST() {
     maxAge: 0,
     path: "/",
   });
+
   if (!sessionId) {
     return res;
   }

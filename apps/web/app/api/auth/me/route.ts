@@ -13,14 +13,23 @@ export async function GET() {
   if (!sessionId) {
     return NextResponse.json(
       { ok: false, error: "oen_session is not set" },
-      { status: 401 }
+      { status: 401 },
     );
   }
   // sessionIdからSession(オブジェクト)を取得
   const session = getSession(sessionId);
   if (!session) {
-    return NextResponse.json({ ok: false, error: "session not found" }, { status: 401 });
+    return NextResponse.json(
+      { ok: false, error: "session not found" },
+      { status: 401 },
+    );
   }
-  return NextResponse.json({ id: sessionId, lineSub: session.lineSub, name: session.name ?? undefined }, { status: 200 });
+  return NextResponse.json(
+    {
+      id: sessionId,
+      lineSub: session.lineSub,
+      name: session.name ?? undefined,
+    },
+    { status: 200 },
+  );
 }
- 
