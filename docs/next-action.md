@@ -1,212 +1,195 @@
 # next-action.md
 
-## Step 1 : LINE ログイン → ダッシュボード到達（MVP）
+## 現状サマリ（2026-01-19 時点）
+
+### 実装済み（apps/web）
+
+- **LINE ログイン（最小）**
+  - `GET /api/auth/line`（ログイン開始）
+  - `GET /api/auth/line/callback`（コールバック）
+  - `LINE_REDIRECT_URI` が未設定の場合でも「LINE に飛べるが callback で死ぬ」問題を潰し、env 不足は `env_missing` に統一
+- **セッション（Cookie）**
+  - `oen_session` を発行（callback 側）
+  - `GET /api/auth/me` は cookie があれば `200`（※user はまだダミー）
+  - `POST /api/auth/logout` で cookie を破棄
+- **画面**
+  - `/login` にログインボタン（`/api/auth/line` に遷移）
+  - `/dashboard` は `GET /api/auth/me` を呼び、`401` なら `/login` に誘導
+- **env ユーティリティ**
+  - `apps/web/app/_lib/env.ts`（`requireEnv`, `isMissingEnvError`）
+  - `apps/web/app/_lib/line/oauth.ts`（`getLineRedirectUri`）
+
+### 未解決（次のボトルネック）
+
+- `oen_session` と **LINE ユーザー（sub / displayName 等）が紐づいていない**
+- `GET /api/auth/me` が **ダミー user**（`name: "admin-user"`）のまま
+- セッションストア（永続化 or メモリ Map）が未実装
 
 ---
 
-## 目的（Step 1）
+## Step 1 : LINE ログイン → ダッシュボード到達（MVP）【完了】
 
-LINE ログインで認証できるようにし、  
-ログイン完了後に **Oh!EN のダッシュボード（仮）へ到達できる状態** を作る。
+### 目的（Step 1）
 
-本ステップでは「LINE ログインが成立し、ログイン状態がアプリ内で継続する」ことだけに集中する。
+LINE ログインで認証できるようにし、ログイン完了後に **Oh!EN のダッシュボード（仮）へ到達**できる状態を作る。
 
----
+### Done の定義（Step 1）
 
-## Done の定義（受け入れ条件）
-
-- ブラウザで `/login` を開ける
-- 「LINE でログイン」ボタンを押す
-- LINE 認可画面が表示され、許可できる
-- Oh!EN に戻ってきて **セッション Cookie（oen_session）が発行される**
-- `/dashboard`（または `/me`）に遷移し、ログイン状態が維持される
-- `GET /api/auth/me`
-  - ログイン時 : `200`
-  - 未ログイン時 : `401`
-- `401` 時はログインガードが正しく機能する
-
----
-
-## 前提（現状の資産）
-
-### Next（apps/web）
-
-- Cookie セッション（`oen_session`）の発行・判定・logout は実装済み
-- 認証判定点は **`GET /api/auth/me` に統一**
-- 本番は **Vercel にデプロイ済み**
-  - 公開 URL: https://oen-seven.vercel.app
-
-### Express（apps/api）
-
-- 現状はスタブのみ
-- LINE ログイン本体は未着手
-- Heroku にデプロイ済み（裏方 API）
+- `/login` を開ける
+- 「LINE でログイン」ボタンで `GET /api/auth/line` に遷移できる
+- LINE 認可後、`GET /api/auth/line/callback` に戻れる
+- callback で **`oen_session` Cookie が発行**される
+- `/dashboard` が表示され、`GET /api/auth/me` によりログイン確認できる
+- 未ログイン時 `GET /api/auth/me` は `401`（ガードが効く）
 
 ---
 
 ## 設計方針（固定）
 
-- **ブラウザは Next のみを叩く**
-- Express をブラウザから直接叩かない
+- **ブラウザは Next のみを叩く**（Express 直叩き禁止）
 - Next は **BFF（Backend For Frontend）**
-- Express は **裏方 API**
-- LINE ログインは「本物のログイン」に差し替えるが、既存の縦スライスは崩さない
-- **Redirect URI は Next（Vercel）に固定する**
+- Express は **裏方 API**（必要なら Next が叩く）
+- Redirect URI は Next（Vercel）に固定
+- env 不足は「開始だけ成功っぽく見える」事故を避けるため **fail-fast**（`env_missing`）に寄せる
 
 ---
 
-## 大まかな実装フロー（Step 1）
+## 環境変数（apps/web）
 
-### 全体フロー（責務）
+### 必須（LINE ログイン）
 
-1. ブラウザ → Next `/login`
-2. Next → LINE 認可画面へリダイレクト（Authorize URL）
-3. LINE → Next（callback）へリダイレクト（`code`, `state`）
-4. Next（callback）
-   - `code/state` 検証
-   - LINE Token API で交換
-   - ID Token / ユーザー情報取得
-5. Next が **`oen_session` Cookie を発行**
-6. Next が `/dashboard` へリダイレクト
-7. `/dashboard` は `GET /api/auth/me` でログイン確認
+- `LINE_CHANNEL_ID`
+- `LINE_CHANNEL_SECRET`
+- `LINE_REDIRECT_URI`（例: `https://oen-seven.vercel.app/api/auth/line/callback`）
+
+### 必須（BFF → Express）
+
+- `OEN_API_BASE_URL`（例: `http://localhost:8080`）
 
 ---
 
-## 作業ステップ（順序付き）
+## 次にやること（Step 2）：セッションを“本物”にする（sub を保持して `me` を LINE 由来に）
 
-### 0. 画面・ルートの最低限を確定
+### 目的（Step 2）
 
-- `/dashboard` を新規作成（中身は白で OK）
-- `/dashboard` で `GET /api/auth/me` を実行
-  - `401` → `/login` にリダイレクト
-  - `200` → 「ログイン中」表示
-- 既存 `/me` を仮ダッシュボードとして使ってもよい
-  - 最終的には `/dashboard` に統一
+「ログインできた」だけでなく、`GET /api/auth/me` が **LINE ユーザー情報を返せる**状態にする。  
+次の PayPay 連携・ユーザー体験改善は、この土台の上で進める。
 
----
+### Done の定義（Step 2）
 
-### 1. LINE チャネル準備（設定）
-
-- LINE Developers で **LINE Login チャネル**を作成
-- Redirect URI を以下に設定する
-
-https://oen-seven.vercel.app/api/auth/line/callback
-
-- スコープは最小構成から開始
-  - `openid`
-  - `profile`
-- メールアドレス取得は必須にしない
-
----
-
-### 2. LINE ログイン開始エンドポイントを追加
-
-**目的**  
-Authorize URL を生成し、LINE 認可画面へリダイレクトする。
-
-- エンドポイント
-  GET /api/auth/line
-
-**やること**
-
-- `state` を生成（CSRF 対策）
-- `nonce` を生成（ID Token 検証用）
-- 以下を **短命 Cookie** に保存（推奨）
-  - `oen_oauth_state`
-  - `oen_oauth_nonce`
-- LINE Authorize URL へリダイレクト
-
-**注意**
-
-- ログイン画面の「LINE でログイン」ボタンは
-  - この API を叩くだけ
-  - state / nonce を画面側で生成しない
-
----
-
-### 3. LINE コールバックエンドポイントを追加
-
-**目的**  
-認可結果を受け取り、Oh!EN のログインを成立させる。
-
-- エンドポイント
-  GET /api/auth/line/callback
-
-**処理順（重要）**
-
-1. クエリから `code` / `state` を取得
-2. Cookie の `oen_oauth_state` と一致するか検証
-   - 不一致ならエラー
-3. LINE Token API に `code` を送ってトークン交換
-4. ID Token / ユーザー情報から **LINE ユーザーを一意に特定**
-   - Step 1 では `sub` 等が取れれば十分
-5. `oen_session` Cookie を発行
-   - 中身はランダムなセッション ID 推奨
-6. `/dashboard` にリダイレクト
-7. `oen_oauth_state` / `oen_oauth_nonce` Cookie を破棄
-
----
-
-### 4. `GET /api/auth/me` を本物に寄せる
-
-現状は「Cookie があればダミー user」。
-
-Step 1 では以下どちらかで OK。
-
-#### A 案（最短）
-
-- Cookie があれば `200`
-- user 情報を LINE 由来に差し替える
-  - `id`, `name` など最低限
-
-#### B 案（次につながる）
-
-- Cookie はセッション ID
-- Next 側で
-  sessionId -> lineUser
-
-を保持し、`/api/auth/me` はそこから user を返す
-
-※ B 案はメモリ保持のため再起動で消えるが、Step 1 では許容
-
----
-
-### 5. mock ログインの扱い
-
-- Step 1 完了までは残して OK（デバッグ用）
-- 完了後は
-  - LINE ログインを主導線に
-  - mock は env で非表示 or 削除
-
----
-
-### 6. 動作確認
-
-- 未ログインで `/dashboard` → `/login`
-- `/login` → LINE 認可 → callback → `/dashboard`
-- `/dashboard` で `/api/auth/me` が `200`
-- logout → `/api/auth/me` が `401`
-- state 不一致で弾かれる
-
----
-
-## この Step で「やらないこと」（意図的な撤退）
-
-- Express 側での本格セッション管理（DB）
-- ユーザー永続化（users テーブル等）
-- Messaging API 連携
-- PayPay 導線（SupportIntent）
-- 複数活動者対応
-
----
-
-## 成果物一覧（Step 1）
-
-- `/dashboard`（または `/me`）
-- `GET /api/auth/line`
-- `GET /api/auth/line/callback`
+- callback で取得した `sub` が `oen_session` と紐づく
 - `GET /api/auth/me`
-- `POST /api/auth/logout`
-- LINE Developers 側設定（Redirect URI）
+  - ログイン時: `200` + `{ id: <sessionId>, lineSub: <sub>, name: <displayName?> }`
+  - 未ログイン時: `401`
+- `POST /api/auth/logout` で cookie 破棄 + （可能なら）セッションストアからも削除
+- `/dashboard` に LINE ユーザー由来の情報（`sub`/`name`）が表示される
 
 ---
+
+## Step 2 作業ステップ（細かく）
+
+### 2-0. どこまで“永続化”するか決める（Step 2 はメモリでも OK）
+
+- **まずは B 案（インメモリ Map）**で OK（再起動で消えるのは許容）
+- 次の Step 3 で DB/Redis に移行できる形にする（インターフェースで隠蔽）
+
+---
+
+### 2-1. セッションストアを作る（Next サーバー専用）
+
+- 新規: `apps/web/app/_lib/auth/session-store.ts`
+- 提供する関数（例）
+  - `createSession({ lineSub, name, pictureUrl? }) -> sessionId`
+  - `getSession(sessionId) -> session | null`
+  - `deleteSession(sessionId)`
+
+---
+
+### 2-2. callback で `sub` を保存して `oen_session` をそれに連動させる
+
+- 対象: `apps/web/app/api/auth/line/callback/route.ts`
+- 変更点
+  - `verify` の結果から `sub` を取得（現状取得済み）
+  - `createSession({ lineSub: sub, ... })` を呼ぶ
+  - 返ってきた `sessionId` を `oen_session` cookie にセット
+  - 可能なら `name` も取る（下記 2-3）
+
+---
+
+### 2-3. 表示名（name）を取る（どちらか選ぶ）
+
+#### A) Profile API を使う（推奨になりがち）
+
+- token 交換レスポンスから `access_token` を取得
+- `GET https://api.line.me/v2/profile` を叩いて `displayName`, `pictureUrl` を取得
+- セッションに保存
+
+#### B) ID Token の claim を使う
+
+- verify レスポンスに `name` / `picture` が含まれていればそれを使う
+- 無い場合は A に切り替え
+
+---
+
+### 2-4. `GET /api/auth/me` をセッションストア参照に変更
+
+- 対象: `apps/web/app/api/auth/me/route.ts`
+- 変更点
+  - cookie `oen_session` を読む
+  - `getSession(oen_session)` を呼ぶ
+  - 存在しない場合: `401`
+  - 存在する場合: `200` で session 由来 user を返す（`lineSub`, `name` 等）
+
+---
+
+### 2-5. logout でセッションストアも削除（できれば）
+
+- 対象: `apps/web/app/api/auth/logout/route.ts`
+- 変更点
+  - cookie から `oen_session` を取得
+  - `deleteSession(sessionId)` を呼ぶ（存在しなくても OK）
+  - cookie を破棄
+
+---
+
+### 2-6. `/dashboard` の表示を最小で整える
+
+- 対象: `apps/web/app/dashboard/page.tsx`
+- `me` のレスポンスを表示
+  - `sub`
+  - `name`
+  - `picture`（あれば）
+
+---
+
+### 2-7. `/login` のエラー表示を最低限つける
+
+- 対象: `apps/web/app/login/page.tsx`
+- `?error=...` を表示（`env_missing`, `state_mismatch`, `token_error` 等）
+
+---
+
+## Step 3（その次）：セッション永続化 & 安全性（PKCE 含む）
+
+- インメモリ Map → DB/Redis（再起動耐性）
+- PKCE 対応（可能なら）
+- Cookie 属性の共通化（`secure/sameSite/maxAge/path` をヘルパー化）
+- ログ/監視（callback 失敗理由の可視化）
+
+---
+
+## PayPay 連携（後回しの理由と前提）
+
+PayPay は「誰の支払いか」「状態遷移（作成 → 承認 → 確定/取消）」が重要なので、まず Step 2 の **ユーザー識別が安定**してから進める。
+
+---
+
+## 参考：主要ファイル
+
+- `apps/web/app/_lib/env.ts`
+- `apps/web/app/_lib/line/oauth.ts`
+- `apps/web/app/api/auth/line/route.ts`
+- `apps/web/app/api/auth/line/callback/route.ts`
+- `apps/web/app/api/auth/me/route.ts`
+- `apps/web/app/api/auth/logout/route.ts`
+- `apps/web/app/dashboard/page.tsx`
