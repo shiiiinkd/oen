@@ -30,9 +30,12 @@ export function createSession({
   return sessionId;
 }
 
+// sessionIdからSessionを取得
 export function getSession(sessionId: string): Session | null {
   return store.get(sessionId) ?? null;
 }
+
+// sessionIdからSessionを削除
 export function deleteSession(sessionId: string): void {
   store.delete(sessionId);
 }
