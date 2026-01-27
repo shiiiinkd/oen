@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getLineRedirectUri } from "@/app/_lib/line/oauth";
 import { requireEnv, isMissingEnvError } from "@/app/_lib/env";
+import { createSession } from "@/app/_lib/auth/session-store";
 
 export const runtime = "nodejs";
 
@@ -16,9 +17,9 @@ export async function GET(request: Request) {
 
   const stateCookie = cookieStore.get("oen_oauth_state")?.value;
   const nonceCookie = cookieStore.get("oen_oauth_nonce")?.value;
-  const sessionId = crypto.randomUUID();
-  const setSessionCookie = (res: NextResponse) => {
-    res.cookies.set("oen_session", sessionId.toString(), {
+  //sessionId
+  const setSessionCookie = (res: NextResponse, sessionId: string) => {
+    res.cookies.set("oen_session", sessionId, {
       httpOnly: true,
       secure: isProd,
       sameSite: "lax",
@@ -117,10 +118,14 @@ export async function GET(request: Request) {
     if (!sub) {
       return redirectToLogin("sub_missing");
     }
+    const name = verifyJson.name ?? null;
+    const pictureUrl = verifyJson.picture ?? null;
+
+    const sessionId = createSession({ lineSub: sub, name, pictureUrl });
 
     const res = NextResponse.redirect(new URL("/dashboard", request.url));
     clearOAuthCookies(res);
-    setSessionCookie(res);
+    setSessionCookie(res, sessionId);
     return res;
   } catch (error) {
     if (isMissingEnvError(error)) {
