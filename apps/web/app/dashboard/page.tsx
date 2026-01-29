@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import LogoutButton from "../me/LogoutButton";
+import PostCreateForm from "./PostCreateForm";
 
 export default function DashboardPage() {
   const [data, setData] = useState<{
@@ -31,6 +32,7 @@ export default function DashboardPage() {
       {data ? <p>lineSub: {data.lineSub}</p> : <p>lineSub is not set</p>}
       {data ? <p>name: {data.name}</p> : <p>name is not set</p>}
       <LogoutButton />
+      <PostCreateForm />
     </>
   );
 }
