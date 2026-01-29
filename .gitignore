@@ -22,3 +22,8 @@ build/
 
 # settings
 request.http
+
+# TypeScript
+dist/
+*.tsbuildinfo
+

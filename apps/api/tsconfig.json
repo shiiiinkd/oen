@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    // File Layout
+    "rootDir": "./src",
+    "outDir": "./dist",
+
+    // Environment Settings (ESM for Node.js)
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "types": ["node"],
+
+    // Allow JS/TS混在 (既存の.jsと新規の.tsを共存)
+    "allowJs": true,
+    "checkJs": false,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+
+    // Other Outputs
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+
+    // Stricter Typechecking Options
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // Recommended Options
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
