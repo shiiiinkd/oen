@@ -57,19 +57,65 @@
 
 ---
 
-## 現状サマリ（実装到達点 / 2026-01-27）
+## 現状サマリ（実装到達点 / 2026-01-31）
 
-### 実装済み（認証 / Step2 Done）
+### ✅ Slice 1完了：投稿作成 + 閲覧
 
-- LINE callbackで `sub` 取得 → セッション作成 → `oen_session` cookie発行
-- `GET /api/auth/me`
-  - ログイン時 200: `{ id: <sessionId>, lineSub: <sub>, name?: <displayName?> }`
-  - 未ログイン/不明セッション 401
-- `POST /api/auth/logout`
-  - cookie破棄 + セッション削除（存在しない場合でもOK）
-- `/dashboard`
-  - ログインユーザー表示（`lineSub`/`name?`）
-  - 401なら `/login` へ
+#### 実装済み機能
+- **LINE認証**
+  - LINE callbackで `sub` 取得 → セッション作成 → `oen_session` cookie発行
+  - `GET /api/auth/me`（ログイン確認・ユーザー情報取得）
+  - `POST /api/auth/logout`（ログアウト）
+  - `/dashboard`（ログインユーザー表示、未認証は `/login` へリダイレクト）
+
+- **投稿機能**
+  - `POST /api/posts`（投稿作成）
+  - `/p/[shareToken]`（投稿閲覧・認証不要）
+  - `posts` テーブル（Supabase）
+
+### 🔄 Slice 2進行中：LINE通知機能
+
+#### 実装方針
+- **Webhook + DB管理**方式を採用
+  - LINE公式アカウントのWebhookで `follow`/`unfollow` イベントを受信
+  - `supporters` テーブルで友だち登録者を自動管理
+  - 投稿作成時に、テーブル内の全員に通知を送信
+
+#### 実装済み（2026-01-31）
+- ✅ `supporters` テーブル作成（Supabase SQL）
+  ```sql
+  CREATE TABLE supporters (
+    line_user_id TEXT PRIMARY KEY,
+    is_blocked BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+  ```
+- ✅ Express側 Supabase Client実装（`apps/api/src/lib/supabase.ts`）
+- ✅ LINE Messaging API環境変数設定完了
+
+#### 次にやること（優先順）
+1. **LINE Messaging関数実装**（`apps/api/src/lib/line-messaging.ts`）
+   - Client初期化（`@line/bot-sdk`）
+   - `sendMessage(userId, text)` 関数作成
+   
+2. **Webhook受信エンドポイント**（`apps/api/src/routes/webhook-line.ts`）
+   - `follow` イベント → `supporters` テーブルに追加（`is_blocked=false`）
+   - `unfollow` イベント → `is_blocked=true` に更新
+   - Webhook署名検証（`channelSecret` 使用）
+
+3. **通知送信エンドポイント**（`apps/api/src/routes/notifications.ts`）
+   - `POST /notifications/post-created`
+   - `supporters` テーブルから `is_blocked=false` の全ユーザー取得
+   - 全員に LINE メッセージ送信
+
+4. **BFF側から通知呼び出し**（`apps/web/app/api/posts/route.ts` 修正）
+   - 投稿作成後に Express API経由で通知送信
+
+5. **ローカルテスト**
+   - ngrok でExpress APIを外部公開
+   - LINE Developers で Webhook URL設定
+   - 友だち追加/ブロック/投稿作成をテスト
 
 ### 開発体験
 
@@ -78,6 +124,9 @@
   - `apps/web` だけで起動すると、`/login` が Express へ疎通 `fetch` して `fetch failed` が出る場合がある（片方だけ起動が原因）
 - Prettier導入・format整備済み（`apps/web`）
   - `npm run format` / `npm run format:check`
+- **TypeScript環境**（Express側）
+  - `tsconfig.json` 設定済み（JS/TS混在可能）
+  - 新規ファイルは `.ts` 推奨、既存 `.js` はそのまま
 
 ---
 
@@ -93,10 +142,24 @@
 
 - `OEN_API_BASE_URL`（例: `http://localhost:8080`）
 
-### 予定（LINE通知 / Messaging API）
+### 必須（apps/web / Supabase）
 
-MVPでは「支援者固定」なので、通知先は一旦 env 固定で回避する（支援者の userId を手で登録）。
-（具体的な env 名は実装時に確定する）
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+### 必須（apps/api / LINE Messaging API）✅ 設定済み
+
+- `LINE_MESSAGING_CHANNEL_ACCESS_TOKEN`（メッセージ送信用）
+- `LINE_MESSAGING_CHANNEL_SECRET`（Webhook署名検証用）
+
+### 必須（apps/api / Supabase）✅ 設定済み
+
+- `SUPABASE_URL`（BFF側と同じプロジェクト）
+- `SUPABASE_SERVICE_ROLE_KEY`（BFF側と同じキー）
+
+### 廃止予定（apps/api）
+
+- ~~`SUPPORTER_LINE_USER_IDS`~~ → Webhook + DB管理方式に移行
 
 ---
 
@@ -134,10 +197,35 @@ MVPでは「支援者固定」なので、通知先は一旦 env 固定で回避
 
 - 投稿が作成されたら、支援者（親2人 + 数人想定）のLINEに投稿URLが届く
 
+#### 実装アーキテクチャ
+
+**Webhook + DB管理方式**を採用：
+1. ユーザーがLINE公式アカウントを友だち追加
+2. Webhookで `follow` イベント受信 → `supporters` テーブルに追加
+3. 投稿作成時に、テーブル内の全ユーザーに通知送信
+4. ユーザーがブロック → Webhookで `unfollow` イベント → `is_blocked=true` に更新
+
+**メリット：**
+- 手動管理不要（自動同期）
+- 再登録にも対応
+- 履歴管理（いつから支援者か分かる）
+
 #### 実装の注意
 
-- LINE Login の `sub` と Messaging API の userId は別物になり得る
-- MVPは「支援者固定」なので、通知先 userId を env 固定で回避して先に進む
+- LINE Login の `sub` と Messaging API の `userId` は別物
+  - Login: OIDC（認証用）
+  - Messaging: 通知送信用
+  - 同じLINEユーザーでも異なるID
+
+#### テーブル設計
+
+**`supporters` テーブル**：
+- `line_user_id` (TEXT, PK): Messaging APIのユーザーID
+- `is_blocked` (BOOLEAN): ブロック状態（false=通知対象）
+- `created_at` (TIMESTAMPTZ): 初回友だち登録日時
+- `updated_at` (TIMESTAMPTZ): 最終更新日時
+
+※将来的に `display_name` などを追加可能（管理画面用）
 
 ---
 
@@ -166,11 +254,22 @@ MVPでは「支援者固定」なので、通知先は一旦 env 固定で回避
 
 ## 参考：主要ファイル
 
+### BFF（Next.js）
 - `apps/web/app/_lib/env.ts`
 - `apps/web/app/_lib/line/oauth.ts`
+- `apps/web/app/_lib/supabase/server.ts`
+- `apps/web/app/_lib/posts/posts-repo.ts`
 - `apps/web/app/api/auth/line/route.ts`
 - `apps/web/app/api/auth/line/callback/route.ts`
 - `apps/web/app/api/auth/me/route.ts`
 - `apps/web/app/api/auth/logout/route.ts`
+- `apps/web/app/api/posts/route.ts`
 - `apps/web/app/dashboard/page.tsx`
 - `apps/web/app/login/page.tsx`
+- `apps/web/app/p/[shareToken]/page.tsx`
+
+### API（Express）
+- `apps/api/src/lib/supabase.ts` ✅
+- `apps/api/src/lib/line-messaging.ts` 🔄次
+- `apps/api/src/routes/webhook-line.ts` （未実装）
+- `apps/api/src/routes/notifications.ts` （未実装）
