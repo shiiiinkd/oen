@@ -4,8 +4,16 @@ import { Router } from "express";
 
 const router = Router();
 
+const channelSecret = process.env.LINE_MESSAGING_CHANNEL_SECRET;
+
+if (!channelSecret) {
+  throw new Error(
+    "Environment variable LINE_MESSAGING_CHANNEL_SECRET is not set"
+  );
+}
+
 const config = {
-  channelSecret: process.env.LINE_MESSAGING_CHANNEL_SECRET!,
+  channelSecret,
 };
 
 type FollowEvent = {
