@@ -5,6 +5,9 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.env.development
+.env.production
+.env.test
 
 # logs
 npm-debug.log*
@@ -27,3 +30,5 @@ request.http
 dist/
 *.tsbuildinfo
 
+# docs
+docs/specification.md
