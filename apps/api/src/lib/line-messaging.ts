@@ -26,7 +26,7 @@ export type TextMessage = {
 export type Message = TextMessage;
 
 export async function sendMessage(
-  userIds: string,
+  userIds: string[],
   message: Message,
 ): Promise<void> {
   if (userIds.length === 0) {
@@ -34,7 +34,7 @@ export async function sendMessage(
   }
 
   await client.multicast({
-    to: [userIds],
+    to: userIds,
     messages: [message],
   });
 }
