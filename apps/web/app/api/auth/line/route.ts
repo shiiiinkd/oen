@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     const isProd = process.env.NODE_ENV === "production";
-    const channelId = requireEnv("LINE_CHANNEL_ID");
+    const channelId = requireEnv("LINE_LOGIN_CHANNEL_ID");
     const redirectUri = getLineRedirectUri();
     const state = crypto.randomUUID();
     const nonce = crypto.randomUUID();
