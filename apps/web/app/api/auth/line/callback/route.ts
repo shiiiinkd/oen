@@ -67,8 +67,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const channelId = requireEnv("LINE_CHANNEL_ID");
-    const channelSecret = requireEnv("LINE_CHANNEL_SECRET");
+    const channelId = requireEnv("LINE_LOGIN_CHANNEL_ID");
+    const channelSecret = requireEnv("LINE_LOGIN_CHANNEL_SECRET");
     const redirectUri = getLineRedirectUri();
 
     //token交換 codeを使ってtokenを取得

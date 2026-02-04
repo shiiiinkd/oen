@@ -34,7 +34,41 @@ export async function POST(request: Request) {
     );
   }
 
+  // 投稿を作成
   const { shareToken } = await createPost(session.lineSub, content);
+
+  // 投稿を作成したら通知を送る
+  try {
+    const apiBaseUrl = process.env.OEN_API_BASE_URL || "http://localhost:8080";
+    const webBaseUrl = process.env.OEN_WEB_BASE_URL;
+
+    if (!webBaseUrl) {
+      console.warn("OEN_WEB_BASE_URL is not set. Skipping notification.");
+    } else {
+      const postUrl = `${webBaseUrl}/p/${shareToken}`;
+      const response = await fetch(`${apiBaseUrl}/notification/post-created`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          postUrl,
+          message: `新しい投稿が作成されました!`,
+        }),
+      });
+      if (!response.ok) {
+        console.error(
+          "Failed to send notification:",
+          response.status,
+          await response.text(),
+        );
+      }
+    }
+    //通知失敗した場合でも投稿は成功、エラーにはしない
+  } catch (notificationError) {
+    console.error("通知送信エラー:", notificationError);
+  }
+
   return NextResponse.json({
     ok: true,
     shareToken,
