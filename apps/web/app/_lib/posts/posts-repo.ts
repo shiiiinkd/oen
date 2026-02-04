@@ -1,20 +1,11 @@
 import "server-only";
-import { createClient } from "@supabase/supabase-js";
-import {
-  getSupabaseServiceRoleKey,
-  getSupabaseUrl,
-} from "@/app/_lib/supabase/server";
+import { getSupabaseAdmin } from "@/app/_lib/supabase/server";
 
 export type Post = {
   content: string;
   ownerLineSub: string;
   createdAt: string;
 };
-
-export function getSupabaseAdmin() {
-  const supabase = createClient(getSupabaseUrl(), getSupabaseServiceRoleKey());
-  return supabase;
-}
 
 export async function createPost(
   ownerLineSub: string,

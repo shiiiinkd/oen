@@ -39,14 +39,14 @@ router.post("/", middleware(config), async (req, res) => {
 
   for (const event of events) {
     if (event.type === "follow") {
-      await supabase.from("supporters").upsert({
+      await supabase.from("users").upsert({
         line_user_id: event.source.userId,
         is_blocked: false,
         updated_at: new Date(event.timestamp),
       });
     } else if (event.type === "unfollow") {
       await supabase
-        .from("supporters")
+        .from("users")
         .update({
           is_blocked: true,
           updated_at: new Date(event.timestamp),

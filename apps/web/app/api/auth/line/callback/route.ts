@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { getLineRedirectUri } from "@/app/_lib/line/oauth";
 import { requireEnv, isMissingEnvError } from "@/app/_lib/env";
 import { createSession } from "@/app/_lib/auth/session-store";
+import { upsertUserByLineSub } from "@/app/_lib/users/users-repo";
 
 export const runtime = "nodejs";
 
@@ -118,10 +119,25 @@ export async function GET(request: Request) {
     if (!sub) {
       return redirectToLogin("sub_missing");
     }
-    const name = verifyJson.name ?? null;
-    const pictureUrl = verifyJson.picture ?? null;
+    // LINE APIから取得した時点でdisplayNameに変換（外部APIとの境界で変換）
+    const displayName = verifyJson.name ?? null;
+    const avatarUrl = verifyJson.picture ?? null;
 
-    const sessionId = createSession({ lineSub: sub, name, pictureUrl });
+    // usersテーブルに保存または更新
+    const { userId, linkToken } = await upsertUserByLineSub({
+      lineSub: sub,
+      displayName: displayName ?? undefined,
+      avatarUrl: avatarUrl ?? undefined,
+    });
+
+    // セッション作成（アプリ内部は統一命名）
+    const sessionId = createSession({
+      lineSub: sub,
+      userId,
+      displayName: displayName ?? undefined,
+      avatarUrl: avatarUrl ?? undefined,
+      linkToken: linkToken ?? undefined,
+    });
 
     const res = NextResponse.redirect(new URL("/dashboard", request.url));
     clearOAuthCookies(res);
@@ -131,6 +147,7 @@ export async function GET(request: Request) {
     if (isMissingEnvError(error)) {
       return redirectToLogin("env_missing");
     }
+    console.error("LINE callback error:", error);
     return redirectToLogin("callback_exception");
   }
 }

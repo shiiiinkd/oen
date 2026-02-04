@@ -11,22 +11,35 @@ const store = globalThis._oenSessionStore;
 
 interface Session {
   lineSub: string;
-  name?: string | null;
-  pictureUrl?: string | null;
+  userId: number;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  linkToken?: string | null;
   createdAt: number;
 }
 
 export function createSession({
   lineSub,
-  name,
-  pictureUrl,
+  userId,
+  displayName,
+  avatarUrl,
+  linkToken,
 }: {
   lineSub: string;
-  name?: string | null;
-  pictureUrl?: string | null;
+  userId: number;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  linkToken?: string | null;
 }): string {
   const sessionId = crypto.randomUUID();
-  store.set(sessionId, { lineSub, name, pictureUrl, createdAt: Date.now() });
+  store.set(sessionId, {
+    lineSub,
+    userId,
+    displayName,
+    avatarUrl,
+    linkToken,
+    createdAt: Date.now(),
+  });
   return sessionId;
 }
 

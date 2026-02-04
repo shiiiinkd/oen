@@ -8,7 +8,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<{
     id: string;
     lineSub: string;
-    name?: string;
+    displayName?: string;
   } | null>(null);
   const router = useRouter();
 
@@ -30,7 +30,11 @@ export default function DashboardPage() {
       <h1>DashboardPage</h1>
       {data ? <p>oen_session: {data.id}</p> : <p>oen_session is not set</p>}
       {data ? <p>lineSub: {data.lineSub}</p> : <p>lineSub is not set</p>}
-      {data ? <p>name: {data.name}</p> : <p>name is not set</p>}
+      {data ? (
+        <p>displayName: {data.displayName}</p>
+      ) : (
+        <p>displayName is not set</p>
+      )}
       <LogoutButton />
       <PostCreateForm />
     </>

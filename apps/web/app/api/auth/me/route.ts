@@ -28,7 +28,7 @@ export async function GET() {
     {
       id: sessionId,
       lineSub: session.lineSub,
-      name: session.name ?? undefined,
+      displayName: session.displayName ?? undefined,
     },
     { status: 200 },
   );
